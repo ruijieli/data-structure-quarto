@@ -1,0 +1,690 @@
+---
+title: "栈"
+subtitle: "后进先出、基本操作与典型应用"
+author: "西南交通大学 李瑞杰"
+jupyter: python3
+format:
+  revealjs:
+    theme: simple
+    css: styles.css
+    highlight-style: github
+    slide-number: true
+    progress: true
+    controls: true
+    chalkboard: true
+    transition: fade
+    background-transition: fade
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.055
+execute:
+  echo: true
+  output: true
+  warning: false
+  freeze: false
+  cache: false
+---
+
+## 先想一想：托盘怎样取？
+
+:::: {.columns}
+::: {.column width="42%"}
+
+新托盘只能放到最上面，取托盘也只能从最上面取。
+
+::: {.question-card}
+若依次放入 **A、B、C**，再连续取出两个，取出顺序是什么？
+:::
+
+::: {.fragment}
+答案：**C、B**。最后进入的 C 最先离开。
+:::
+
+:::
+::: {.column width="58%"}
+
+![](assets/stack-trays-handdrawn.png){.hero-art}
+
+:::
+::::
+
+---
+
+## 本节目标
+
+学完后，你能够：
+
+- 用 **LIFO** 解释栈的逻辑特征
+- 在图中准确标出栈顶、栈底与空栈
+- 逐步执行 `push`、`pop`、`peek`
+- 用顺序存储实现一个带边界检查的栈
+- 用栈解决括号匹配和表达式计算，并分析复杂度
+
+---
+
+## 栈是什么？
+
+**栈（stack）** 是只允许在同一端进行插入和删除的线性表。
+
+```{=html}
+<div class="stack-intro-layout">
+  <div class="concept-list">
+    <div class="concept-card"><b>栈顶 <em>top</em></b><span>插入、删除<br>都在这一端</span></div>
+    <div class="concept-card"><b>栈底 <em>bottom</em></b><span>固定的一端<br>不直接操作</span></div>
+    <div class="concept-card lifo-card"><b>LIFO</b><span>后进先出</span></div>
+  </div>
+  <figure class="stack-metaphor">
+    <img src="assets/stack-trays-handdrawn.png" alt="手从一摞托盘的顶部放入或取出托盘">
+    <div class="top-label">栈顶：只能从这里放、取</div>
+    <div class="bottom-label">栈底：最先放入</div>
+    <figcaption>像摞托盘：最后放上的，最先被取走</figcaption>
+  </figure>
+</div>
+```
+
+::: {.callout-note}
+“栈”描述的是操作受限的**逻辑结构**；它可以用数组，也可以用链表实现。
+:::
+
+---
+
+## 一张图读懂栈
+
+```{=html}
+<div class="stack-anatomy">
+  <div class="top-tag">← top：只操作这里</div>
+  <div class="stack-item hot">D</div>
+  <div class="stack-item">C</div>
+  <div class="stack-item">B</div>
+  <div class="stack-item">A</div>
+  <div class="bottom-tag">栈底 bottom</div>
+</div>
+```
+
+| 操作 | 含义 | 是否改变栈 |
+|---|---|:---:|
+| `push(x)` | 将元素 x 压入栈顶 | 是 |
+| `pop()` | 删除并返回栈顶元素 | 是 |
+| `peek()` | 只读取栈顶元素 | 否 |
+| `is_empty()` | 判断栈是否为空 | 否 |
+
+---
+
+## 静态过程图：入栈 push(C)
+
+```{=html}
+<div class="process-strip">
+  <div class="process-stage"><small>① 初始</small><div class="mini-stack"><i>B</i><i>A</i></div><p>top 指向 B</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>② 准备</small><div class="floating">C</div><div class="mini-stack"><i>B</i><i>A</i></div><p>C 等待进入</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>③ 完成</small><div class="mini-stack"><i class="hot">C</i><i>B</i><i>A</i></div><p>top 改为 C</p></div>
+</div>
+```
+
+::: {.callout-tip}
+入栈只在栈顶增加一个元素；A、B 的相对次序不变。
+:::
+
+---
+
+## 交互演示：入栈与出栈
+
+```{=html}
+<div class="demo" id="stack-ops-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">操作序列：push(A), push(B), push(C), pop()</span>
+  </div>
+  <div class="stack-scene"></div>
+  <div class="change-note"></div>
+  <div class="demo-status"></div>
+</div>
+```
+
+每次点击只完成一次关键操作。观察 `top` 与返回值如何变化。
+
+---
+
+## 顺序栈：用数组存储
+
+:::: {.columns}
+::: {.column width="54%"}
+
+```{python}
+class ArrayStack:
+    def __init__(self):
+        self._data = []
+
+    def is_empty(self):
+        return len(self._data) == 0
+
+    def push(self, item):
+        self._data.append(item)
+
+    def peek(self):
+        if self.is_empty():
+            raise IndexError("空栈没有栈顶元素")
+        return self._data[-1]
+```
+
+:::
+::: {.column width="46%"}
+
+**逻辑结构**：只能操作栈顶。
+
+**存储结构**：数组中的有效元素连续排列。
+
+**Python 实现**：用 `list` 尾部对应栈顶，避免从表头搬移元素。
+
+::: {.callout-important}
+约定必须一致：这里的栈顶是 `_data[-1]`。
+:::
+
+:::
+::::
+
+---
+
+## 出栈代码与运行轨迹
+
+```{python}
+#| code-line-numbers: true
+def pop(self, trace=False):
+    if self.is_empty():
+        raise IndexError("不能从空栈出栈")
+    item = self._data.pop()
+    if trace:
+        print(f"弹出 {item}，剩余：{self._data}")
+    return item
+
+ArrayStack.pop = pop
+
+s = ArrayStack()
+for value in ["A", "B", "C"]:
+    s.push(value)
+print("栈顶：", s.peek())
+print("返回：", s.pop(trace=True))
+print("返回：", s.pop(trace=True))
+```
+
+::: {.fragment}
+`pop()` 既修改栈，又返回原栈顶元素；`peek()` 只读不删。
+:::
+
+---
+
+## 边界：下溢与上溢
+
+:::: {.columns}
+::: {.column width="50%"}
+
+### 栈下溢 underflow
+
+对空栈执行 `pop()` 或 `peek()`。
+
+- 先检查 `is_empty()`
+- 可抛出异常或返回约定值
+- 不要悄悄返回错误数据
+
+:::
+::: {.column width="50%"}
+
+### 栈上溢 overflow
+
+固定容量栈已经装满仍执行 `push()`。
+
+- 顺序栈需检查 `size == capacity`
+- 动态数组通常自动扩容
+- 受限内存中仍可能失败
+
+:::
+::::
+
+::: {.question-card}
+Python `list` 自动扩容，是否意味着永远不会上溢？
+:::
+
+---
+
+## 操作复杂度
+
+| 操作 | 顺序栈（动态数组） | 链栈 | 成立前提 |
+|---|:---:|:---:|---|
+| `push` | 摊还 $O(1)$ | $O(1)$ | 链栈已知栈顶；数组偶尔扩容 |
+| `pop` | $O(1)$ | $O(1)$ | 从约定的栈顶端操作 |
+| `peek` | $O(1)$ | $O(1)$ | 直接保存或定位栈顶 |
+| 判空 | $O(1)$ | $O(1)$ | 保存长度或栈顶引用 |
+
+::: {.callout-warning}
+动态数组的单次 `push` 在扩容时可能是 $O(n)$；连续多次操作的平均代价是摊还 $O(1)$。
+:::
+
+---
+
+## 应用：括号匹配的思路
+
+例子：
+匹配例子 `100+{16+2*[14-(3+5)]}`
+不匹配的例子 `100+{16+2*[14-(3+5)]`
+
+扫描表达式 `([{}])`：
+
+1. 遇到左括号：压栈
+2. 遇到右括号：与栈顶左括号配对
+3. 不匹配或栈已空：立即失败
+4. 扫描结束后栈也为空：匹配成功
+
+::: {.question-card}
+为什么不能只统计左、右括号数量？例如 `([)]` 的数量相等，但它正确吗？
+:::
+
+::: {.fragment}
+不正确。括号不仅要数量相等，还必须满足**最近打开的括号最先闭合**，恰好是 LIFO。
+:::
+
+---
+
+## 交互演示：括号匹配
+
+```{=html}
+<div class="demo" id="bracket-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">扫描下一个</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">表达式：([{}])</span>
+  </div>
+  <div class="token-row"></div>
+  <div class="bracket-layout"><div class="bracket-stack"></div><div class="rule-card"></div></div>
+  <div class="demo-status"></div>
+</div>
+```
+
+黄色表示当前字符，珊瑚红表示刚发生的压栈或弹栈。
+
+---
+
+## 括号匹配代码
+
+```{python}
+def brackets_match(text, trace=False):
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack = []
+    for ch in text:
+        if ch in "([{":
+            stack.append(ch)
+        elif ch in pairs:
+            if not stack or stack.pop() != pairs[ch]:
+                return False
+        if trace:
+            print(f"读 {ch!r}：{stack}")
+    return not stack
+
+print(brackets_match("([{}])", trace=True))
+print(brackets_match("([)]", trace=True))
+```
+
+时间复杂度 $O(n)$，辅助空间最坏 $O(n)$。
+
+---
+
+## 综合案例：计算带括号的表达式
+
+要计算：
+
+$$12 + 3 \times (8 - 5) - 6 \div 2$$
+
+计算机需要同时处理**括号、优先级和结合方向**。我们把任务拆成两段：
+
+```{=html}
+<div class="calculator-route">
+  <div><small>人习惯书写</small><b>中缀表达式</b><code>12 + 3 × (8 - 5) - 6 ÷ 2</code></div>
+  <i>① 运算符栈 →</i>
+  <div class="route-hot"><small>便于顺序执行</small><b>后缀表达式</b><code>12 3 8 5 − × + 6 2 ÷ −</code></div>
+  <i>② 操作数栈 →</i>
+  <div class="route-answer"><small>最终结果</small><b>18</b></div>
+</div>
+```
+
+::: {.question-card}
+两个阶段都使用栈，但栈里保存的是同一种东西吗？
+:::
+
+---
+
+## 第一段：中缀转后缀的规则
+
+从左向右扫描一个个**词元**：
+
+| 当前词元 | 处理方式 |
+|---|---|
+| 数字 | 直接追加到后缀输出 |
+| `(` | 压入运算符栈 |
+| `)` | 弹出到输出，直到遇见 `(`；括号本身不输出 |
+| 运算符 | 先弹出优先级更高或相同的栈顶运算符，再把自己入栈 |
+| 扫描结束 | 把栈中剩余运算符依次弹出 |
+
+::: {.callout-tip}
+`+ -` 的优先级低于 `× ÷`；四个运算符都按**从左到右**结合。
+:::
+
+---
+
+## 交互演示：中缀转后缀
+
+```{=html}
+<div class="demo expression-demo" id="infix-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">黄色：当前词元　珊瑚红：本步变化</span>
+  </div>
+  <div class="calc-token-row"></div>
+  <div class="conversion-scene">
+    <div class="calc-panel"><b>运算符栈</b><div class="operator-stack"></div><small>栈顶在上</small></div>
+    <div class="decision-card"></div>
+    <div class="calc-panel output-panel"><b>后缀输出</b><div class="postfix-output"></div></div>
+  </div>
+  <div class="demo-status"></div>
+</div>
+```
+
+特别观察第二个 `−`：为什么要先弹出 `×` 和 `+`，再把它压栈？
+
+---
+
+## 中缀转后缀代码
+
+```{python}
+import re
+
+def tokenize(expr):
+    """把多位整数和运算符拆成词元。"""
+    return re.findall(r"\d+|[()+\-*/]", expr.replace(" ", ""))
+
+def to_postfix(expr, trace=False):
+    priority = {"+": 1, "-": 1, "*": 2, "/": 2}
+    output, operators = [], []
+
+    for token in tokenize(expr):
+        if token.isdigit():
+            output.append(token)
+        elif token == "(":
+            operators.append(token)
+        elif token == ")":
+            while operators[-1] != "(":
+                output.append(operators.pop())
+            operators.pop()                 # 丢弃左括号
+        else:
+            while (operators and operators[-1] != "(" and
+                   priority[operators[-1]] >= priority[token]):
+                output.append(operators.pop())
+            operators.append(token)
+        if trace:
+            print(f"{token:>2} | 栈={operators} | 输出={output}")
+
+    while operators:
+        output.append(operators.pop())
+    return output
+
+expr = "12 + 3 * (8 - 5) - 6 / 2"
+postfix = to_postfix(expr)
+print("后缀：", " ".join(postfix))
+```
+
+---
+
+## 第二段：用后缀表达式求值
+
+后缀表达式不需要括号，也不需要反复比较优先级：
+
+1. 遇到数字：压入**操作数栈**
+2. 遇到运算符：弹出右操作数，再弹出左操作数
+3. 计算 `左 运算符 右`，结果重新入栈
+4. 扫描结束：栈中唯一的数就是答案
+
+::: {.callout-warning}
+对 `8 5 −`：先弹出的是 `5`，后弹出的是 `8`，必须计算 `8 − 5`。减法和除法不能颠倒左右操作数。
+:::
+
+---
+
+## 交互演示：后缀表达式求值
+
+```{=html}
+<div class="demo expression-demo" id="postfix-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">表达式：12 3 8 5 − × + 6 2 ÷ −</span>
+  </div>
+  <div class="postfix-token-row"></div>
+  <div class="evaluation-scene">
+    <div class="calc-panel"><b>操作数栈</b><div class="value-stack"></div><small>栈顶在上</small></div>
+    <div class="calculation-card"></div>
+  </div>
+  <div class="demo-status"></div>
+</div>
+```
+
+每遇到一个运算符，画面只完成一次“弹出两个数 → 计算 → 结果入栈”。
+
+---
+
+## 后缀求值代码
+
+```{python}
+def eval_postfix(tokens, trace=False):
+    stack = []
+    operations = {
+        "+": lambda a, b: a + b,
+        "-": lambda a, b: a - b,
+        "*": lambda a, b: a * b,
+        "/": lambda a, b: a / b,
+    }
+
+    for token in tokens:
+        if token.isdigit():
+            stack.append(int(token))
+        else:
+            right = stack.pop()       # 先弹出右操作数
+            left = stack.pop()        # 后弹出左操作数
+            stack.append(operations[token](left, right))
+        if trace:
+            print(f"{token:>2} | 栈={stack}")
+
+    if len(stack) != 1:
+        raise ValueError("后缀表达式不合法")
+    return stack[0]
+
+print("计算结果：", eval_postfix(postfix))
+```
+
+::: {.callout-note}
+两个阶段都只需从左向右扫描一次，因此时间复杂度均为 $O(n)$，辅助空间最坏为 $O(n)$。
+:::
+
+---
+
+
+
+## 课堂练习
+
+初始为空栈，依次执行：
+
+```text
+push(3), push(7), pop(), push(5), push(9), peek(), pop()
+```
+
+1. 两次 `pop()` 分别返回什么？
+2. `peek()` 返回什么？它是否改变栈？
+3. 最终从栈顶到栈底有哪些元素？
+
+::: {.fragment}
+答案：两次 `pop()` 返回 7、9；`peek()` 返回 9 且不改变栈；最终从栈顶到栈底为 5、3。
+:::
+
+---
+
+## 小结
+
+- 栈是操作受限的线性表：只在**栈顶**插入和删除
+- LIFO 描述“最后进入，最先离开”
+- `push`、`pop`、`peek` 的含义必须分清
+- 顺序栈与链栈是不同存储实现，基本操作通常为 $O(1)$
+- 括号匹配的“最近打开，最先闭合”正是栈的典型应用
+- 表达式计算可分为“运算符栈转换”和“操作数栈求值”两个阶段
+
+::: {.callout-tip}
+检验是否理解栈：不要背定义，画出每一步的栈顶变化。
+:::
+
+<script>
+const setupStackOpsDemo = () => {
+  const root = document.getElementById("stack-ops-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const states = [
+    {items:[], change:null, note:"准备开始", text:"空栈：top 不指向任何元素"},
+    {items:["A"], change:"A", note:"push(A)", text:"A 入栈，top 指向 A"},
+    {items:["A","B"], change:"B", note:"push(B)", text:"B 入栈，top 从 A 移到 B"},
+    {items:["A","B","C"], change:"C", note:"push(C)", text:"C 入栈，top 从 B 移到 C"},
+    {items:["A","B"], change:"B", note:"pop() → C", text:"弹出并返回 C，top 回到 B"}
+  ];
+  let step = 0;
+  const scene = root.querySelector(".stack-scene");
+  const note = root.querySelector(".change-note");
+  const status = root.querySelector(".demo-status");
+  const render = () => {
+    const s = states[step];
+    scene.innerHTML = s.items.length ? `<div class="top-pointer">top →</div><div class="vertical-stack">${[...s.items].reverse().map((v,i)=>`<div class="v-item ${i===0 && step>0 ? "active" : ""}">${v}</div>`).join("")}</div>` : `<div class="empty-stack">空栈 ∅</div>`;
+    note.textContent = s.note;
+    status.textContent = `步骤 ${step + 1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const setupBracketDemo = () => {
+  const root = document.getElementById("bracket-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const tokens = ["(","[","{","}","]",")"];
+  const states = [
+    {i:-1, stack:[], rule:"尚未扫描", text:"栈为空，准备从左向右扫描"},
+    {i:0, stack:["("], rule:"左括号：push (", text:"读到 (，压栈"},
+    {i:1, stack:["(","["], rule:"左括号：push [", text:"读到 [，压栈"},
+    {i:2, stack:["(","[","{"], rule:"左括号：push {", text:"读到 {，压栈"},
+    {i:3, stack:["(","["], rule:"} 与 { 配对：pop", text:"最近的 { 被 } 正确闭合"},
+    {i:4, stack:["("], rule:"] 与 [ 配对：pop", text:"最近的 [ 被 ] 正确闭合"},
+    {i:5, stack:[], rule:") 与 ( 配对：pop", text:"扫描结束且栈为空：匹配成功"}
+  ];
+  let step=0;
+  const render=()=>{
+    const s=states[step];
+    root.querySelector(".token-row").innerHTML=tokens.map((t,i)=>`<span class="token ${i===s.i?"current":""} ${i<s.i?"done":""}">${t}</span>`).join("");
+    root.querySelector(".bracket-stack").innerHTML=s.stack.length?`<small>栈顶</small>${[...s.stack].reverse().map((x,i)=>`<i class="${i===0?"hot":""}">${x}</i>`).join("")}<small>栈底</small>`:`<div class="empty-stack">空栈 ∅</div>`;
+    root.querySelector(".rule-card").textContent=s.rule;
+    root.querySelector(".demo-status").textContent=`步骤 ${step+1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const setupInfixDemo = () => {
+  const root = document.getElementById("infix-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const tokens = ["12","+","3","×","(","8","−","5",")","−","6","÷","2"];
+  const states = [
+    {i:-1, stack:[], out:[], text:"准备从左向右扫描", rule:"数字直接输出；运算符暂存在栈中"},
+    {i:0, stack:[], out:["12"], text:"12 是数字，直接输出", rule:"输出 12", outHot:true},
+    {i:1, stack:["+"], out:["12"], text:"运算符栈为空，+ 入栈", rule:"push(+)"},
+    {i:2, stack:["+"], out:["12","3"], text:"3 是数字，直接输出", rule:"输出 3", outHot:true},
+    {i:3, stack:["+","×"], out:["12","3"], text:"× 的优先级高于栈顶 +，直接入栈", rule:"push(×)"},
+    {i:4, stack:["+","×","("], out:["12","3"], text:"左括号作为边界入栈", rule:"push(()"},
+    {i:5, stack:["+","×","("], out:["12","3","8"], text:"8 是数字，直接输出", rule:"输出 8", outHot:true},
+    {i:6, stack:["+","×","(","−"], out:["12","3","8"], text:"栈顶是左括号，− 入栈", rule:"push(−)"},
+    {i:7, stack:["+","×","(","−"], out:["12","3","8","5"], text:"5 是数字，直接输出", rule:"输出 5", outHot:true},
+    {i:8, stack:["+","×","("], out:["12","3","8","5","−"], text:"遇到右括号，先把 − 弹出到输出", rule:"pop(−) → 输出", outHot:true},
+    {i:8, stack:["+","×"], out:["12","3","8","5","−"], text:"再弹出并丢弃左括号；括号不进入后缀表达式", rule:"pop(()，不输出"},
+    {i:9, stack:["+"], out:["12","3","8","5","−","×"], text:"当前 − 优先级低于栈顶 ×，弹出 ×", rule:"pop(×) → 输出", outHot:true},
+    {i:9, stack:[], out:["12","3","8","5","−","×","+"], text:"当前 − 与栈顶 + 同级且从左结合，继续弹出 +", rule:"pop(+) → 输出", outHot:true},
+    {i:9, stack:["−"], out:["12","3","8","5","−","×","+"], text:"更高或同级运算符已处理，当前 − 入栈", rule:"push(−)"},
+    {i:10, stack:["−"], out:["12","3","8","5","−","×","+","6"], text:"6 是数字，直接输出", rule:"输出 6", outHot:true},
+    {i:11, stack:["−","÷"], out:["12","3","8","5","−","×","+","6"], text:"÷ 的优先级高于栈顶 −，直接入栈", rule:"push(÷)"},
+    {i:12, stack:["−","÷"], out:["12","3","8","5","−","×","+","6","2"], text:"2 是数字，直接输出", rule:"输出 2", outHot:true},
+    {i:12, stack:["−"], out:["12","3","8","5","−","×","+","6","2","÷"], text:"扫描结束，弹出栈顶 ÷", rule:"pop(÷) → 输出", outHot:true},
+    {i:12, stack:[], out:["12","3","8","5","−","×","+","6","2","÷","−"], text:"继续弹出 −，运算符栈清空，转换完成", rule:"后缀表达式完成", outHot:true}
+  ];
+  let step = 0;
+  const render = () => {
+    const s = states[step];
+    root.querySelector(".calc-token-row").innerHTML = tokens.map((t,i)=>`<span class="token ${i===s.i?"current":""} ${i<s.i?"done":""}">${t}</span>`).join("");
+    root.querySelector(".operator-stack").innerHTML = s.stack.length ? [...s.stack].reverse().map((x,i)=>`<i class="${i===0?"hot":""}">${x}</i>`).join("") : `<span class="stack-empty-label">空栈 ∅</span>`;
+    root.querySelector(".postfix-output").innerHTML = s.out.map((x,i)=>`<i class="${s.outHot && i===s.out.length-1?"hot":""}">${x}</i>`).join("");
+    root.querySelector(".decision-card").textContent = s.rule;
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const setupPostfixDemo = () => {
+  const root = document.getElementById("postfix-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const tokens = ["12","3","8","5","−","×","+","6","2","÷","−"];
+  const states = [
+    {i:-1, stack:[], calc:"准备扫描后缀表达式", text:"操作数栈为空"},
+    {i:0, stack:[12], calc:"push(12)", text:"数字 12 入栈"},
+    {i:1, stack:[12,3], calc:"push(3)", text:"数字 3 入栈"},
+    {i:2, stack:[12,3,8], calc:"push(8)", text:"数字 8 入栈"},
+    {i:3, stack:[12,3,8,5], calc:"push(5)", text:"数字 5 入栈"},
+    {i:4, stack:[12,3,3], calc:"8 − 5 = 3", text:"先弹出 5，再弹出 8；结果 3 入栈"},
+    {i:5, stack:[12,9], calc:"3 × 3 = 9", text:"弹出两个 3；结果 9 入栈"},
+    {i:6, stack:[21], calc:"12 + 9 = 21", text:"弹出 9 和 12；结果 21 入栈"},
+    {i:7, stack:[21,6], calc:"push(6)", text:"数字 6 入栈"},
+    {i:8, stack:[21,6,2], calc:"push(2)", text:"数字 2 入栈"},
+    {i:9, stack:[21,3], calc:"6 ÷ 2 = 3", text:"先弹出 2，再弹出 6；结果 3 入栈"},
+    {i:10, stack:[18], calc:"21 − 3 = 18", text:"表达式扫描结束，栈中唯一元素 18 就是答案", answer:true}
+  ];
+  let step = 0;
+  const render = () => {
+    const s = states[step];
+    root.querySelector(".postfix-token-row").innerHTML = tokens.map((t,i)=>`<span class="token ${i===s.i?"current":""} ${i<s.i?"done":""}">${t}</span>`).join("");
+    root.querySelector(".value-stack").innerHTML = s.stack.length ? [...s.stack].reverse().map((x,i)=>`<i class="${i===0 && step>0?"hot":""}">${x}</i>`).join("") : `<span class="stack-empty-label">空栈 ∅</span>`;
+    root.querySelector(".calculation-card").innerHTML = s.answer ? `<span class="answer">${s.calc}</span>` : s.calc;
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const addPythonTutorLinks = () => {
+  document.querySelectorAll("div.sourceCode.cell-code").forEach(block => {
+    if (block.dataset.tutorReady) return;
+    const code = block.innerText;
+    if (!code || code.length > 1800) return;
+    block.dataset.tutorReady = "true";
+    const link = document.createElement("a");
+    link.className = "pythontutor-link";
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "在 Python Tutor 中逐句执行 ↗";
+    link.href = `https://pythontutor.com/render.html#code=${encodeURIComponent(code)}&cumulative=false&curInstr=0&heapPrimitives=nevernest&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false`;
+    block.insertAdjacentElement("afterend", link);
+  });
+};
+
+const setupCourse = () => { setupStackOpsDemo(); setupBracketDemo(); setupInfixDemo(); setupPostfixDemo(); addPythonTutorLinks(); };
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupCourse, {once:true});
+else setupCourse();
+document.addEventListener("slidechanged", setupCourse);
+</script>

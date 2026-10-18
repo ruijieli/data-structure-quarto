@@ -1,0 +1,507 @@
+---
+title: "哈希表"
+subtitle: "从哈希函数到冲突处理"
+author: "西南交通大学 李瑞杰"
+jupyter: python3
+format:
+  revealjs:
+    theme: simple
+    css: styles.css
+    highlight-style: github
+    slide-number: true
+    progress: true
+    controls: true
+    chalkboard: true
+    transition: fade
+    background-transition: fade
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.055
+execute:
+  echo: true
+  output: true
+  warning: false
+  freeze: false
+  cache: false
+---
+
+## 先想一想：怎样一步找到学号？
+
+:::: {.columns}
+::: {.column width="44%"}
+
+若把学号 `20251037` 直接换算成一个“抽屉编号”，查找时就不必从头逐个比较。
+
+::: {.question-card}
+有 11 个抽屉，最简单的换算方法是什么？
+:::
+
+::: {.fragment}
+可以先试 `20251037 % 11 = 3`，把记录放进 3 号抽屉。
+:::
+
+:::
+::: {.column width="56%"}
+
+```{=html}
+<div class="locker-scene" aria-label="由关键字定位抽屉">
+  <div class="key-card">关键字<br><b>20251037</b></div>
+  <div class="hash-machine">h(key)<small>取模换算</small></div>
+  <div class="big-arrow">→</div>
+  <div class="locker hot"><small>地址</small>3</div>
+</div>
+```
+
+:::
+::::
+
+---
+
+## 本节目标
+
+学完后，你能够：
+
+- 说清 **关键字、哈希函数、哈希地址、哈希表** 的关系
+- 手算除留余数法，并判断两个关键字是否发生冲突
+- 逐步执行线性探测与链地址法的插入、查找
+- 解释开放定址法删除为什么需要“墓碑”
+- 实现一个可运行的哈希表，并分析平均与最坏复杂度
+- 用装载因子判断何时需要扩容
+
+---
+
+## 哈希表是什么？
+
+哈希表（散列表）根据关键字 `key`，通过哈希函数直接计算存储位置：
+
+$$address = h(key)$$
+
+```{=html}
+<div class="concept-grid">
+  <div class="concept-card"><b>关键字 key</b><span>用于唯一标识记录<br>如学号、用户名</span></div>
+  <div class="concept-card"><b>哈希函数 h</b><span>把关键字映射为<br>有限地址</span></div>
+  <div class="concept-card"><b>哈希表 table</b><span>按计算出的地址<br>存放记录</span></div>
+</div>
+```
+
+::: {.callout-note}
+哈希表是一种**存储结构与查找技术**。它不保证元素有序，也不是“按下标查找”的同义词。
+:::
+
+---
+
+## 一次成功查找经过什么？
+
+```{=html}
+<div class="lookup-flow">
+  <div class="flow-step"><small>① 输入</small><b>key = 26</b><span>要查找的关键字</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step"><small>② 计算</small><b>26 % 7 = 5</b><span>得到哈希地址</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-step active"><small>③ 比较</small><b>table[5] = 26</b><span>确认关键字相等</span></div>
+</div>
+```
+
+::: {.question-card}
+为什么到达 `table[5]` 后仍然要比较关键字，而不能直接宣布“找到了”？
+:::
+
+::: {.fragment}
+因为不同关键字可能映射到同一地址；地址相同不代表关键字相同。
+:::
+
+---
+
+## 除留余数法：简单，但要选好表长
+
+对整数关键字，常用：
+
+$$h(key) = key \bmod m$$
+
+其中 `m` 是哈希表长度。取 `m = 7`：
+
+| key | 10 | 17 | 24 | 31 | 18 |
+|---:|:---:|:---:|:---:|:---:|:---:|
+| `key % 7` | 3 | 3 | 3 | 3 | 4 |
+
+::: {.callout-warning}
+哈希函数的目标不是“绝不冲突”——有限地址面对大量关键字，冲突通常不可避免。目标是让关键字尽量**均匀分布**。
+:::
+
+---
+
+## 冲突：不同关键字，同一地址
+
+```{=html}
+<div class="collision-board">
+  <div class="collision-keys"><span>10</span><span>17</span><span>24</span></div>
+  <div class="chalk-formula">key % 7</div>
+  <div class="chalk-arrows">↘　↓　↙</div>
+  <div class="bucket-focus"><small>地址 3</small><b>发生冲突！</b></div>
+</div>
+```
+
+解决冲突的两条主路线：
+
+- **开放定址法**：冲突后，在表内继续寻找空位置
+- **链地址法**：同一地址的记录组织在同一条链中
+
+---
+
+## 线性探测：冲突后向后找
+
+表长 `m = 7`，探测序列为：
+
+$$index_i = (h(key) + i) \bmod m,\quad i=0,1,2,\ldots$$
+
+```{=html}
+<div class="process-strip">
+  <div class="process-stage"><small>① 插入 10</small><div class="mini-table"><i>0</i><i>1</i><i>2</i><i class="hot">10</i><i>4</i></div><p>10 % 7 = 3<br>地址 3 为空</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>② 插入 17</small><div class="mini-table"><i>0</i><i>1</i><i>2</i><i class="read">10</i><i class="hot">17</i></div><p>地址 3 被占<br>探测到 4</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>③ 插入 24</small><div class="mini-table"><i>0</i><i>1</i><i>2</i><i class="read">10</i><i class="read">17</i></div><p>继续探测 5<br>再写入 24</p></div>
+</div>
+```
+
+---
+
+## 交互演示：逐步插入 10、17、24、31
+
+```{=html}
+<div class="demo" id="linear-probe-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">表长 7；黄色 = 正在探测，珊瑚红 = 本步写入</span>
+  </div>
+  <div class="probe-formula"></div>
+  <div class="hash-array"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+观察：连续冲突会形成一段拥挤区域，称为**一次聚集（primary clustering）**。
+
+---
+
+## 查找必须复现同一条探测路径
+
+查找 `24` 时，不能只看它的初始地址 3：
+
+```{=html}
+<div class="search-strip">
+  <div><small>探测 3</small><b>10</b><span>不相等，继续</span></div>
+  <div class="search-arrow">→</div>
+  <div><small>探测 4</small><b>17</b><span>不相等，继续</span></div>
+  <div class="search-arrow">→</div>
+  <div class="found"><small>探测 5</small><b>24</b><span>关键字相等，成功</span></div>
+</div>
+```
+
+查找停止的条件：
+
+- 找到相等关键字：成功
+- 遇到**从未使用过的空位置**：失败
+- 已探测一整圈：失败
+
+---
+
+## 删除陷阱：直接清空会“截断”查找
+
+```{=html}
+<div class="delete-compare">
+  <div class="bad-card"><b>✗ 直接清空地址 4</b><div class="tiny-array"><i>10</i><i class="empty">空</i><i>24</i></div><span>查找 24 在地址 4 遇到“空”，会错误停止。</span></div>
+  <div class="ok-card"><b>✓ 写入墓碑 DEL</b><div class="tiny-array"><i>10</i><i class="tomb">DEL</i><i>24</i></div><span>墓碑表示“可插入，但查找必须继续”。</span></div>
+</div>
+```
+
+::: {.callout-important}
+开放定址表至少要区分三种槽位状态：`EMPTY`（从未使用）、`OCCUPIED`（有效记录）、`DELETED`（曾使用，现已删除）。
+:::
+
+---
+
+## 交互演示：删除 17 后查找 24
+
+```{=html}
+<div class="demo" id="tombstone-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">对比 EMPTY 与 DELETED 的语义</span>
+  </div>
+  <div class="tomb-query">search(24)</div>
+  <div class="hash-array"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+每一步只改变一个事实：删除标记、开始查找、越过墓碑、找到目标。
+
+---
+
+## 链地址法：每个桶保存一条链
+
+```{=html}
+<div class="chain-table" aria-label="链地址哈希表">
+  <div class="bucket"><b>0</b><div class="chain-row"><span class="empty-chain">∅</span></div></div>
+  <div class="bucket"><b>1</b><div class="chain-row"><span>15</span><em>→</em><span>22</span></div></div>
+  <div class="bucket"><b>2</b><div class="chain-row"><span class="empty-chain">∅</span></div></div>
+  <div class="bucket hot-bucket"><b>3</b><div class="chain-row"><span>10</span><em>→</em><span>17</span><em>→</em><span>24</span></div></div>
+  <div class="bucket"><b>4</b><div class="chain-row"><span>18</span></div></div>
+</div>
+```
+
+- 先算桶号，再在桶内逐个比较关键字
+- 删除只需从对应链中移除节点，不需要墓碑
+- 桶可以用链表实现；Python 中也可用短列表表达
+
+---
+
+## 交互演示：链地址法插入
+
+```{=html}
+<div class="demo" id="chaining-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">操作序列：put(10)、put(17)、put(24)、put(18)</span>
+  </div>
+  <div class="chain-demo-scene"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+同一桶中的节点共享哈希地址，但关键字仍彼此不同。
+
+---
+
+## Python 实现：链地址哈希表
+
+```{python}
+class HashTable:
+    def __init__(self, capacity=7):
+        self.buckets = [[] for _ in range(capacity)]
+        self.size = 0
+
+    def _index(self, key):
+        return hash(key) % len(self.buckets)
+
+    def put(self, key, value, trace=False):
+        index = self._index(key)
+        bucket = self.buckets[index]
+        for pair in bucket:
+            if pair[0] == key:
+                pair[1] = value
+                if trace: print(f"更新桶 {index}: {key} → {value}")
+                return
+        bucket.append([key, value])
+        self.size += 1
+        if trace: print(f"插入桶 {index}: {key} → {value}")
+
+    def get(self, key, trace=False):
+        index = self._index(key)
+        for pair in self.buckets[index]:
+            if trace: print(f"桶 {index} 中比较 {pair[0]}")
+            if pair[0] == key:
+                return pair[1]
+        raise KeyError(key)
+```
+
+---
+
+## 运行轨迹：插入、更新与查找
+
+```{python}
+table = HashTable(7)
+table.put(10, "A", trace=True)
+table.put(17, "B", trace=True)
+table.put(24, "C", trace=True)
+table.put(17, "B+", trace=True)   # 相同 key：更新，不新增
+
+print("查找结果：", table.get(24, trace=True))
+print("元素个数：", table.size)
+print("3 号桶：", table.buckets[3])
+```
+
+::: {.callout-tip}
+代码中的 `hash(key)` 是语言实现层面的哈希值；再对桶数取模，才能得到当前表中的合法下标。
+:::
+
+---
+
+## 装载因子：表有多“挤”？
+
+$$\alpha = \frac{n}{m}$$
+
+- `n`：表中记录数
+- `m`：桶数或槽位数
+
+```{=html}
+<div class="load-meter">
+  <div class="meter-label"><b>α = 5 / 7 ≈ 0.71</b><span>装载因子升高，冲突通常增多</span></div>
+  <div class="meter-track"><span style="width:71%"></span></div>
+  <div class="meter-scale"><span>稀疏</span><span>常见扩容区间</span><span>拥挤</span></div>
+</div>
+```
+
+::: {.callout-note}
+阈值不是数学定律，而是实现策略。扩容时必须重新计算每个元素在新表长下的地址，这叫**再哈希（rehash）**。
+:::
+
+---
+
+## 复杂度：$O(1)$ 是有条件的平均表现
+
+| 操作 | 平均情况 | 最坏情况 | 关键前提 |
+|---|:---:|:---:|---|
+| 查找 | $O(1)$ | $O(n)$ | 哈希分布较均匀，装载因子受控 |
+| 插入 | $O(1)$ 摊还 | $O(n)$ | 偶尔扩容与再哈希 |
+| 删除 | $O(1)$ | $O(n)$ | 先定位到目标关键字 |
+| 空间 | $O(m+n)$ | $O(m+n)$ | 链地址法包含桶数组与节点 |
+
+::: {.callout-warning}
+若大量关键字集中到一个桶，链地址哈希表会退化成线性查找；开放定址表也会产生很长的探测序列。
+:::
+
+---
+
+## 哈希表与有序结构怎么选？
+
+| 需求 | 哈希表 | 有序数组 / 平衡树 |
+|---|:---:|:---:|
+| 精确按 key 查询 | 擅长 | 可以 |
+| 按 key 有序遍历 | 不保证 | 擅长 |
+| 范围查询 `a ≤ key ≤ b` | 不擅长 | 擅长 |
+| 平均插入、删除 | 常为 $O(1)$ | 常为 $O(\log n)$ |
+
+::: {.question-card}
+通讯录要“按姓名前缀列出所有人”，只用哈希表合适吗？
+:::
+
+::: {.fragment}
+不太合适。哈希表擅长精确匹配，但不保留关键字的顺序与邻近关系。
+:::
+
+---
+
+## 课堂练习：手算线性探测
+
+长度为 7 的空表，`h(key) = key % 7`，依次插入：
+
+```text
+10, 17, 24, 18, 31
+```
+
+1. 每个关键字最终落在哪个下标？
+2. 成功查找 `31` 需要比较几次？
+3. 删除 `17` 时为什么不能把槽位直接改成 `EMPTY`？
+
+::: {.fragment}
+答案：10→3，17→4，24→5，18→6，31→0；查找 31 比较 5 次；直接清空会截断 24、31 的探测链。
+:::
+
+---
+
+## 小结
+
+- 哈希函数把**关键字**映射为有限的**哈希地址**
+- 冲突不可怕，必须有一致的冲突处理规则
+- 线性探测在表内继续找空位；查找要复现同一路径
+- 开放定址删除用墓碑保持探测链连续
+- 链地址法把同址记录组织在一个桶内
+- 平均 $O(1)$ 依赖均匀分布与受控装载因子；最坏仍是 $O(n)$
+
+::: {.callout-tip}
+理解哈希表的最好方法：每次都画出“初始地址 → 冲突 → 下一探测位置 → 停止条件”。
+:::
+
+<script>
+const bindStepper = (root, states, renderState) => {
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  let step = 0;
+  const render = () => renderState(states[step], step, states.length);
+  root.querySelector('[data-action="next"]').addEventListener("click", () => {
+    step = Math.min(step + 1, states.length - 1); render();
+  });
+  root.querySelector('[data-action="reset"]').addEventListener("click", () => {
+    step = 0; render();
+  });
+  render();
+};
+
+const setupLinearProbeDemo = () => {
+  const root = document.getElementById("linear-probe-demo");
+  const states = [
+    {cells:[null,null,null,null,null,null,null], active:-1, kind:"", formula:"准备插入", text:"空表：7 个槽位都为 EMPTY"},
+    {cells:[null,null,null,10,null,null,null], active:3, kind:"write", formula:"10 % 7 = 3", text:"地址 3 为空，写入 10"},
+    {cells:[null,null,null,10,null,null,null], active:3, kind:"probe", formula:"17 % 7 = 3", text:"地址 3 已有 10，发生冲突"},
+    {cells:[null,null,null,10,17,null,null], active:4, kind:"write", formula:"(3 + 1) % 7 = 4", text:"地址 4 为空，写入 17"},
+    {cells:[null,null,null,10,17,null,null], active:3, kind:"probe", formula:"24 % 7 = 3", text:"地址 3 冲突，开始线性探测"},
+    {cells:[null,null,null,10,17,null,null], active:4, kind:"probe", formula:"(3 + 1) % 7 = 4", text:"地址 4 仍被占用，继续"},
+    {cells:[null,null,null,10,17,24,null], active:5, kind:"write", formula:"(3 + 2) % 7 = 5", text:"地址 5 为空，写入 24"},
+    {cells:[null,null,null,10,17,24,null], active:6, kind:"probe", formula:"31：3 → 4 → 5 → 6", text:"31 连续遇到 10、17、24，探测到地址 6"},
+    {cells:[null,null,null,10,17,24,31], active:6, kind:"write", formula:"(3 + 3) % 7 = 6", text:"地址 6 为空，写入 31；形成连续聚集"}
+  ];
+  bindStepper(root, states, (s, step, total) => {
+    root.querySelector(".probe-formula").textContent = s.formula;
+    root.querySelector(".hash-array").innerHTML = s.cells.map((v,i) => `<div class="hash-cell ${i===s.active?s.kind:""}"><small>${i}</small><b>${v ?? "EMPTY"}</b></div>`).join("");
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${total}：${s.text}`;
+  });
+};
+
+const setupTombstoneDemo = () => {
+  const root = document.getElementById("tombstone-demo");
+  const base = [null,null,null,10,17,24,null];
+  const states = [
+    {cells:base, active:4, kind:"remove", text:"初始：定位到 17，准备删除"},
+    {cells:[null,null,null,10,"DEL",24,null], active:4, kind:"tomb", text:"把地址 4 标记为 DELETED，而不是 EMPTY"},
+    {cells:[null,null,null,10,"DEL",24,null], active:3, kind:"probe", text:"查找 24：先探测初始地址 3，遇到 10"},
+    {cells:[null,null,null,10,"DEL",24,null], active:4, kind:"probe", text:"探测地址 4：遇到墓碑，不能停止"},
+    {cells:[null,null,null,10,"DEL",24,null], active:5, kind:"found", text:"继续到地址 5，关键字 24 相等，查找成功"}
+  ];
+  bindStepper(root, states, (s, step, total) => {
+    root.querySelector(".hash-array").innerHTML = s.cells.map((v,i) => `<div class="hash-cell ${i===s.active?s.kind:""} ${v==="DEL"?"is-tomb":""}"><small>${i}</small><b>${v ?? "EMPTY"}</b></div>`).join("");
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${total}：${s.text}`;
+  });
+};
+
+const setupChainingDemo = () => {
+  const root = document.getElementById("chaining-demo");
+  const states = [
+    {buckets:[[],[],[],[],[],[],[]], active:-1, value:"", text:"空表：每个桶都是空链"},
+    {buckets:[[],[],[],[10],[],[],[]], active:3, value:"10", text:"10 % 7 = 3，把 10 加入 3 号桶"},
+    {buckets:[[],[],[],[10,17],[],[],[]], active:3, value:"17", text:"17 % 7 = 3，冲突记录加入同一桶"},
+    {buckets:[[],[],[],[10,17,24],[],[],[]], active:3, value:"24", text:"24 % 7 = 3，3 号桶继续增长"},
+    {buckets:[[],[],[],[10,17,24],[18],[],[]], active:4, value:"18", text:"18 % 7 = 4，18 进入 4 号桶"}
+  ];
+  bindStepper(root, states, (s, step, total) => {
+    root.querySelector(".chain-demo-scene").innerHTML = s.buckets.map((bucket,i) => `<div class="demo-bucket ${i===s.active?"active":""}"><b>${i}</b><div>${bucket.length ? bucket.map(v=>`<span class="${String(v)===s.value?"new-node":""}">${v}</span>`).join("<em>→</em>") : "∅"}</div></div>`).join("");
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${total}：${s.text}`;
+  });
+};
+
+const addPythonTutorLinks = () => {
+  document.querySelectorAll("div.sourceCode.cell-code").forEach(block => {
+    if (block.dataset.tutorReady) return;
+    const code = block.innerText;
+    if (!code || code.length > 2400) return;
+    block.dataset.tutorReady = "true";
+    const link = document.createElement("a");
+    link.className = "pythontutor-link";
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "在 Python Tutor 中逐句执行 ↗";
+    link.href = `https://pythontutor.com/render.html#code=${encodeURIComponent(code)}&cumulative=false&curInstr=0&heapPrimitives=nevernest&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false`;
+    block.insertAdjacentElement("afterend", link);
+  });
+};
+
+const setupCourse = () => { setupLinearProbeDemo(); setupTombstoneDemo(); setupChainingDemo(); addPythonTutorLinks(); };
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupCourse, {once:true});
+else setupCourse();
+document.addEventListener("slidechanged", setupCourse);
+</script>

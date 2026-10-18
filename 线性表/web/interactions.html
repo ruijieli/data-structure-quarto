@@ -1,0 +1,56 @@
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const arrayDemo = document.querySelector('#array-insert-demo');
+  const states = [
+    { values: ['A','B','C','D','_'], moving: [], note: '初始状态：准备在下标 2 插入 X。' },
+    { values: ['A','B','C','D','D'], moving: [4], note: '先把最右侧的 D 搬到空位。' },
+    { values: ['A','B','C','C','D'], moving: [3], note: '再把 C 向右搬一格。' },
+    { values: ['A','B','X','C','D'], moving: [], inserted: 2, note: '空位出现后，写入 X。' }
+  ];
+  let step = 0;
+  function renderArray() {
+    if (!arrayDemo) return;
+    const state = states[step];
+    arrayDemo.querySelector('.array-stage').innerHTML = state.values.map((v,i) =>
+      `<span class="array-cell ${state.moving.includes(i)?'moving':''} ${state.inserted===i?'inserted':''} ${v==='_'?'empty':''}"><small>${i}</small>${v}</span>`
+    ).join('');
+    arrayDemo.querySelector('.step-label').textContent = `步骤 ${step+1} / ${states.length}`;
+    arrayDemo.querySelector('.demo-note').textContent = state.note;
+  }
+  arrayDemo?.addEventListener('click', (e) => {
+    const action = e.target.dataset.action;
+    if (action === 'next') step = Math.min(states.length - 1, step + 1);
+    if (action === 'prev') step = Math.max(0, step - 1);
+    if (action === 'reset') step = 0;
+    renderArray();
+  });
+  renderArray();
+
+  const walk = document.querySelector('#walk-demo');
+  let walkIndex = -1;
+  function renderWalk() {
+    walk?.querySelectorAll('[data-index]').forEach((node, i) => node.classList.toggle('active', i === walkIndex));
+    if (walk) walk.querySelector('.walk-status').textContent = walkIndex < 0 ? '当前：head，尚未访问节点' : `当前访问下标 ${walkIndex}，值为 ${[12,25,37,48][walkIndex]}`;
+  }
+  walk?.addEventListener('click', (e) => {
+    if (e.target.dataset.action === 'walk') walkIndex = Math.min(3, walkIndex + 1);
+    if (e.target.dataset.action === 'walk-reset') walkIndex = -1;
+    renderWalk();
+  });
+
+  const deleteDemo = document.querySelector('#linked-delete-demo');
+  deleteDemo?.addEventListener('click', (e) => {
+    const stage = deleteDemo.querySelector('.linked-stage');
+    const status = deleteDemo.querySelector('.delete-status');
+    if (e.target.dataset.action === 'delete') {
+      stage.classList.add('deleted');
+      status.textContent = '删除后：25 的 next 直接指向 48，随后释放节点 37。';
+    }
+    if (e.target.dataset.action === 'delete-reset') {
+      stage.classList.remove('deleted');
+      status.textContent = '删除前：25 的 next 指向 37';
+    }
+  });
+});
+</script>
+

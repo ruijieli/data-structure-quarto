@@ -1,0 +1,610 @@
+---
+title: "时间复杂度"
+subtitle: "从运行次数到增长数量级"
+author: "数据结构课堂"
+lang: zh-CN
+jupyter: python3
+format:
+  revealjs:
+    theme: simple
+    css: styles.css
+    highlight-style: github
+    slide-number: true
+    progress: true
+    controls: true
+    chalkboard: true
+    transition: fade
+    background-transition: fade
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.055
+execute:
+  echo: true
+  output: true
+  warning: false
+  freeze: false
+  cache: false
+---
+
+## 热身：谁更“快”？
+
+:::: {.columns}
+::: {.column width="46%"}
+
+同一个查找任务，两位同学各写了一段程序：
+
+- 程序 A 在这台电脑上运行 `0.02 s`
+- 程序 B 在另一台电脑上运行 `0.03 s`
+
+::: {.question-card}
+能否据此断定 A 的算法更好？
+:::
+
+::: {.fragment}
+不能。机器、语言、输入规模都不同。我们更关心：**输入规模增大时，基本操作次数怎样增长？**
+:::
+
+:::
+::: {.column width="54%"}
+
+```{=html}
+<div class="chalk-scene stopwatch-scene" aria-label="算法计时与增长趋势">
+  <div class="stopwatch">0.02<small>秒</small></div>
+  <div class="versus">≠</div>
+  <div class="growth-card"><small>更值得比较</small><b>T(n)</b><span>随 n 的增长趋势</span></div>
+</div>
+```
+
+:::
+::::
+
+---
+
+## 本节目标
+
+学完后，你能够：
+
+- 区分 **实际运行时间**、**语句频度** 与 **时间复杂度**
+- 确定输入规模 `n`，选择基本操作并写出 `T(n)`
+- 用大 O 记号化简 `T(n)`，说明它表达的是增长上界
+- 识别 `O(1)`、`O(log n)`、`O(n)`、`O(n log n)`、`O(n²)`
+- 分析顺序、分支、循环与嵌套循环
+- 区分最好、最坏和平均时间复杂度
+- 通过计数实验检验复杂度判断
+
+---
+
+## 三个层次：别把它们混在一起
+
+```{=html}
+<div class="concept-grid">
+  <div class="concept-card"><b>实际运行时间</b><span>秒、毫秒<br>受机器与实现影响</span></div>
+  <div class="concept-card"><b>语句频度 T(n)</b><span>基本操作执行次数<br>是 n 的函数</span></div>
+  <div class="concept-card"><b>时间复杂度</b><span>增长数量级<br>忽略低阶项与常数因子</span></div>
+</div>
+```
+
+::: {.callout-note}
+时间复杂度描述的是**算法规模增长的趋势**，不是某次运行消耗了多少秒。
+:::
+
+---
+
+## 分析算法的四步法
+
+```{=html}
+<div class="analysis-flow">
+  <div><small>①</small><b>确定规模 n</b><span>输入中什么在增长？</span></div>
+  <i>→</i>
+  <div><small>②</small><b>选基本操作</b><span>比较、赋值或访问</span></div>
+  <i>→</i>
+  <div><small>③</small><b>计算 T(n)</b><span>它执行了多少次？</span></div>
+  <i>→</i>
+  <div><small>④</small><b>取增长数量级</b><span>写成 O(g(n))</span></div>
+</div>
+```
+
+::: {.question-card}
+分析在长度为 `n` 的数组中按值查找时，`n` 表示什么？基本操作又是什么？
+:::
+
+::: {.fragment}
+`n` 是数组中的元素个数；基本操作可选“将当前元素与目标值比较”。
+:::
+
+---
+
+## 从 T(n) 到 O(g(n))
+
+若基本操作执行次数为：
+
+$$T(n)=3n^2+5n+100$$
+
+当 `n` 足够大时，最高阶项决定增长趋势：
+
+```{=html}
+<div class="simplify-strip">
+  <div><b>3n² + 5n + 100</b><span>完整计数</span></div>
+  <em>忽略低阶项</em>
+  <div><b>3n²</b><span>保留主导项</span></div>
+  <em>忽略常数因子</em>
+  <div class="answer"><b>O(n²)</b><span>增长数量级</span></div>
+</div>
+```
+
+::: {.callout-important}
+大 O 给出渐近上界。课堂中的“复杂度是 O(n²)”通常指一个紧的、最能反映增长趋势的上界；严格说，`3n²+5n+100` 也属于 `O(n³)`，但后者信息较弱。
+:::
+
+---
+
+## 常见增长数量级
+
+| 数量级 | 直观含义 | 典型例子 |
+|---|---|---|
+| `O(1)` | 输入变大，操作次数基本不变 | 数组按下标访问 |
+| `O(log n)` | 每一步把问题缩小固定比例 | 二分查找 |
+| `O(n)` | 每个元素至多处理常数次 | 顺序遍历 |
+| `O(n log n)` | 分层处理，每层线性工作 | 归并排序 |
+| `O(n²)` | 两两组合或双重完整循环 | 冒泡排序（典型实现） |
+| `O(2ⁿ)` | 每增加一个元素，分支近似翻倍 | 枚举所有子集 |
+
+::: {.callout-warning}
+`O(1)` 表示操作次数不随 `n` 增长，并不表示“只执行 1 次”。
+:::
+
+---
+
+## 交互：让 n 翻倍，会发生什么？
+
+```{=html}
+<div class="demo" id="growth-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="smaller">n ÷ 2</button>
+    <button type="button" data-action="larger">n × 2</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">比较的是操作次数数量级，不是秒数</span>
+  </div>
+  <div class="growth-n"></div>
+  <div class="growth-bars" aria-label="不同复杂度随输入规模增长的对比"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+观察：`n` 翻倍时，`n²` 约变为原来的 **4 倍**；`log₂n` 只增加 **1**。
+
+---
+
+## O(1)：固定次数，不等于“一步”
+
+:::: {.columns}
+::: {.column width="51%"}
+
+```{python}
+def first_and_last(values):
+    first = values[0]
+    last = values[-1]
+    total = first + last
+    return total
+
+print(first_and_last([4, 7, 9, 12]))
+```
+
+:::
+::: {.column width="49%"}
+
+无论列表有 4 个还是 4 万个元素，这段函数始终只进行固定数量的访问与运算。
+
+$$T(n)=c \Rightarrow O(1)$$
+
+::: {.callout-note}
+前提：列表支持按下标直接访问。这里分析的是该函数本身，不把构造输入列表的代价算进去。
+:::
+
+:::
+::::
+
+---
+
+## O(n)：一次只推进一个元素
+
+```{=html}
+<div class="demo" id="linear-scan-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">比较下一项</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">在 [8, 3, 6, 9, 2] 中查找 2</span>
+  </div>
+  <div class="scan-array"></div>
+  <div class="comparison-count"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+最坏情况下需要比较 `n` 次：
+
+$$T_{worst}(n)=n \Rightarrow O(n)$$
+
+---
+
+## 线性查找：代码与动画一一对应
+
+:::: {.columns}
+::: {.column width="57%"}
+
+```{python}
+def linear_search(values, target, trace=False):
+    for i, value in enumerate(values):
+        if trace:
+            print(f"比较 {i}: {value} == {target}?")
+        if value == target:
+            return i
+    return -1
+
+data = [8, 3, 6, 9, 2]
+print("位置：", linear_search(data, 2, trace=True))
+```
+
+:::
+::: {.column width="43%"}
+
+- 最好：目标在首位，`O(1)`
+- 最坏：目标在末尾或不存在，`O(n)`
+- 平均：需先说明输入分布；常见假设下仍为 `O(n)`
+
+::: {.callout-tip}
+看到 `return` 要考虑提前结束，不能机械地把循环次数都写成 `n`。
+:::
+
+:::
+::::
+
+---
+
+## O(log n)：每次丢掉一半
+
+```{=html}
+<div class="halving-board">
+  <div><small>32 个候选</small><span class="blocks b32"></span></div>
+  <i>↓ 保留一半</i>
+  <div><small>16 个候选</small><span class="blocks b16"></span></div>
+  <i>↓</i>
+  <div><small>8 个候选</small><span class="blocks b8"></span></div>
+  <i>↓ …</i>
+  <div class="answer"><b>1 个候选</b><span>约 log₂32 = 5 次</span></div>
+</div>
+```
+
+若经过 `k` 次缩小后只剩 1 个：
+
+$$\frac{n}{2^k}=1 \Rightarrow k=\log_2 n$$
+
+::: {.callout-note}
+二分查找达到 `O(log n)` 的关键前提是：数据有序，并且能高效访问中间位置。
+:::
+
+---
+
+## 顺序结构：复杂度由最慢部分主导
+
+```{python}
+def summarize(values):
+    first = values[0]             # O(1)
+    total = 0
+    for value in values:          # O(n)
+        total += value
+    return first, total           # O(1)
+```
+
+$$T(n)=c_1+c_2n+c_3 \Rightarrow O(n)$$
+
+```{=html}
+<div class="rule-card"><b>顺序相加：</b><span>保留增长最快的一项</span><em>O(1) + O(n) + O(1) = O(n)</em></div>
+```
+
+---
+
+## 分支结构：先问“走哪条路”
+
+```{python}
+def contains(values, target, sorted_input=False):
+    if sorted_input:
+        return binary_search(values, target)  # O(log n)
+    return linear_search(values, target)      # O(n)
+```
+
+- 一次调用只执行其中一个分支
+- 若分析**最坏情况**：取代价较大的分支，为 `O(n)`
+- 若题目保证 `sorted_input=True`：本次走二分分支，为 `O(log n)`
+
+::: {.callout-warning}
+不能把两个互斥分支机械相加。复杂度结论必须写清输入条件与分析口径。
+:::
+
+---
+
+## 嵌套循环：先看内层究竟跑几次
+
+```{=html}
+<div class="demo" id="nested-loop-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">执行下一次</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">n = 4；只执行 j ≤ i 的位置</span>
+  </div>
+  <div class="loop-grid" aria-label="三角形嵌套循环执行位置"></div>
+  <div class="loop-formula"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+每次点击只新增一次基本操作。最终次数为 `1+2+3+4`，形成三角形而非完整正方形。
+
+---
+
+## 三角形嵌套循环仍是 O(n²)
+
+:::: {.columns}
+::: {.column width="55%"}
+
+```{python}
+def triangular_count(n, trace=False):
+    count = 0
+    for i in range(n):
+        for j in range(i + 1):
+            count += 1
+            if trace:
+                print(f"i={i}, j={j}, count={count}")
+    return count
+
+print(triangular_count(4, trace=True))
+```
+
+:::
+::: {.column width="45%"}
+
+$$T(n)=1+2+\cdots+n$$
+
+$$=\frac{n(n+1)}{2}=\frac{1}{2}n^2+\frac{1}{2}n$$
+
+$$\Rightarrow O(n^2)$$
+
+::: {.callout-tip}
+“嵌套两层”常提示平方级，但可靠做法仍是写出每层真实迭代次数。
+:::
+
+:::
+::::
+
+---
+
+## 不是所有双重循环都是 O(n²)
+
+```{python}
+def shrinking_work(n):
+    count = 0
+    size = n
+    while size > 1:          # 约 log₂n 轮
+        for _ in range(n):   # 每轮 n 次
+            count += 1
+        size //= 2
+    return count
+```
+
+外层约 `log₂n` 轮，每轮内层固定执行 `n` 次：
+
+$$T(n) \approx n\log_2 n \Rightarrow O(n\log n)$$
+
+::: {.question-card}
+若内层改成 `for _ in range(size)`，总次数还是 `n log n` 吗？
+:::
+
+::: {.fragment}
+不是。总次数约为 `n+n/2+n/4+…<2n`，因此是 `O(n)`。
+:::
+
+---
+
+## 实验：计数验证增长趋势
+
+```{python}
+def linear_work(n):
+    return sum(1 for _ in range(n))
+
+def quadratic_work(n):
+    return sum(1 for _ in range(n) for _ in range(n))
+
+print(f"{'n':>4} {'linear':>8} {'quadratic':>10}")
+for n in [10, 20, 40, 80]:
+    print(f"{n:>4} {linear_work(n):>8} {quadratic_work(n):>10}")
+```
+
+::: {.callout-note}
+这里计数而非计时，避免机器负载干扰。`n` 翻倍：线性计数约乘 2，平方计数约乘 4。
+:::
+
+---
+
+## 最好、最坏、平均：同一算法的三张脸
+
+以长度为 `n` 的线性查找为例：
+
+```{=html}
+<div class="case-grid">
+  <div class="best"><b>最好情况</b><span>目标在第 1 个位置</span><em>1 次 → O(1)</em></div>
+  <div class="average"><b>平均情况</b><span>需声明概率分布</span><em>约 (n+1)/2 次 → O(n)</em></div>
+  <div class="worst"><b>最坏情况</b><span>目标在末尾或不存在</span><em>n 次 → O(n)</em></div>
+</div>
+```
+
+::: {.callout-important}
+若题目没有特别说明，教材分析常关注最坏情况；但这不是定义本身，结论中应明确写出“最坏”。
+:::
+
+---
+
+## 常见误区诊断
+
+| 说法 | 问题 | 更准确的表达 |
+|---|---|---|
+| “一行代码就是 O(1)” | 一行可能调用线性甚至更慢的操作 | 看该操作内部随 `n` 如何增长 |
+| “两层循环一定 O(n²)” | 循环范围可能递减或对数缩小 | 写出各层真实次数并求和 |
+| “O(n) 一定比 O(n²) 快” | 小规模时常数、硬件仍有影响 | 渐近结论针对足够大的 `n` |
+| “二分查找永远 O(log n)” | 忽略有序与访问方式前提 | 写明数据有序且可高效访问中点 |
+| “平均复杂度就是最好和最坏取平均” | 缺少输入概率分布 | 用期望值并声明分布假设 |
+
+---
+
+## 课堂挑战：先判断，再验证
+
+```{python}
+def mystery(n):
+    count = 0
+    i = 1
+    while i < n:
+        for _ in range(i):
+            count += 1
+        i *= 2
+    return count
+
+for n in [8, 16, 32, 64]:
+    print(n, mystery(n))
+```
+
+::: {.question-card}
+外层是 `O(log n)`，内层次数又在增长。总复杂度是 `O(log n)`、`O(n log n)` 还是 `O(n)`？
+:::
+
+::: {.fragment}
+`1+2+4+…+n/2 < n`，所以总复杂度为 **O(n)**。不要只看循环层数。
+:::
+
+---
+
+## 一页总结：复杂度分析检查单
+
+```{=html}
+<div class="summary-board">
+  <div><b>1</b><span>明确输入规模 `n`</span></div>
+  <div><b>2</b><span>选择基本操作</span></div>
+  <div><b>3</b><span>写出真实执行次数 `T(n)`</span></div>
+  <div><b>4</b><span>保留主导增长项</span></div>
+  <div><b>5</b><span>说明最好 / 最坏 / 平均</span></div>
+  <div><b>6</b><span>写清成立前提</span></div>
+</div>
+```
+
+> 最可靠的习惯：**不要数代码行，也不要只数循环层数；要数基本操作。**
+
+---
+
+## 课后练习
+
+1. 分析把长度为 `n` 的数组全部元素复制到新数组的时间复杂度。
+2. 分析循环 `for i in range(0, n, 2)` 的执行次数与复杂度。
+3. 写出二分查找的 `trace=False` 版本，开启跟踪时打印 `left, mid, right`。
+4. 对比在数组中“按下标访问”和“按值查找”的复杂度与前提。
+5. 设计一个计数实验，验证 `1+2+…+n` 的增长数量级。
+
+```{=html}
+<script>
+(() => {
+  const setupGrowthDemo = () => {
+    const root = document.getElementById("growth-demo");
+    if (!root || root.dataset.ready) return;
+    root.dataset.ready = "true";
+    let n = 16;
+    const rows = [
+      ["O(1)", x => 1, "fixed"],
+      ["O(log n)", x => Math.log2(x), "log"],
+      ["O(n)", x => x, "linear"],
+      ["O(n log n)", x => x * Math.log2(x), "nlog"],
+      ["O(n²)", x => x * x, "square"]
+    ];
+    const render = () => {
+      root.querySelector(".growth-n").innerHTML = `当前输入规模：<b>n = ${n}</b>`;
+      const max = n * n;
+      root.querySelector(".growth-bars").innerHTML = rows.map(([name, fn, cls]) => {
+        const value = fn(n);
+        const width = 10 + 90 * Math.sqrt(value / max);
+        const shown = Number.isInteger(value) ? value : value.toFixed(1);
+        return `<div class="growth-row"><b>${name}</b><span><i class="${cls}" style="width:${width}%"></i></span><em>${shown}</em></div>`;
+      }).join("");
+      root.querySelector(".demo-status").textContent = `若 n 再翻倍到 ${n * 2}，线性约乘 2，平方约乘 4。`;
+    };
+    root.querySelector('[data-action="larger"]').addEventListener("click", () => { n = Math.min(128, n * 2); render(); });
+    root.querySelector('[data-action="smaller"]').addEventListener("click", () => { n = Math.max(4, n / 2); render(); });
+    root.querySelector('[data-action="reset"]').addEventListener("click", () => { n = 16; render(); });
+    render();
+  };
+
+  const setupScanDemo = () => {
+    const root = document.getElementById("linear-scan-demo");
+    if (!root || root.dataset.ready) return;
+    root.dataset.ready = "true";
+    const values = [8, 3, 6, 9, 2];
+    let step = 0;
+    const render = () => {
+      root.querySelector(".scan-array").innerHTML = values.map((v, i) => {
+        const cls = i < step ? (v === 2 ? "found" : "checked") : i === step && step < values.length ? "current" : "";
+        return `<div class="${cls}"><small>${i}</small><b>${v}</b></div>`;
+      }).join("");
+      root.querySelector(".comparison-count").textContent = `已完成比较：${step} 次`;
+      const status = step === 0 ? "初始状态：准备从下标 0 开始。" : step < values.length ? `已排除前 ${step} 个元素；current 移向下标 ${step}。` : "第 5 次比较找到 2；最坏情况走完整个数组。";
+      root.querySelector(".demo-status").textContent = status;
+    };
+    root.querySelector('[data-action="next"]').addEventListener("click", () => { step = Math.min(values.length, step + 1); render(); });
+    root.querySelector('[data-action="reset"]').addEventListener("click", () => { step = 0; render(); });
+    render();
+  };
+
+  const setupNestedDemo = () => {
+    const root = document.getElementById("nested-loop-demo");
+    if (!root || root.dataset.ready) return;
+    root.dataset.ready = "true";
+    const active = [];
+    for (let i = 0; i < 4; i++) for (let j = 0; j <= i; j++) active.push([i, j]);
+    let step = 0;
+    const render = () => {
+      let html = "";
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        const index = active.findIndex(([r, c]) => r === i && c === j);
+        const eligible = j <= i;
+        const cls = !eligible ? "unused" : index < step ? "done" : index === step && step < active.length ? "current" : "pending";
+        html += `<div class="${cls}"><small>i=${i}, j=${j}</small>${eligible ? "●" : "—"}</div>`;
+      }
+      root.querySelector(".loop-grid").innerHTML = html;
+      root.querySelector(".loop-formula").textContent = `已执行 ${step} 次；总计 1 + 2 + 3 + 4 = 10 次`;
+      const status = step === 0 ? "初始状态：还未进入循环体。" : step < active.length ? `刚完成第 ${step} 次操作；每次只增加一个格子。` : "全部完成：执行位置组成三角形，数量仍与 n² 同阶。";
+      root.querySelector(".demo-status").textContent = status;
+    };
+    root.querySelector('[data-action="next"]').addEventListener("click", () => { step = Math.min(active.length, step + 1); render(); });
+    root.querySelector('[data-action="reset"]').addEventListener("click", () => { step = 0; render(); });
+    render();
+  };
+
+  const addPythonTutorLinks = () => {
+    document.querySelectorAll("pre code.sourceCode.python").forEach((code, index) => {
+      const pre = code.closest("pre");
+      if (!pre || pre.parentElement.querySelector(":scope > .pythontutor-link")) return;
+      const source = code.textContent;
+      if (source.length < 80 || source.length > 1600) return;
+      const url = "https://pythontutor.com/render.html#code=" + encodeURIComponent(source) + "&cumulative=false&curInstr=0&heapPrimitives=nevernest&mode=display&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false";
+      const link = document.createElement("a");
+      link.className = "pythontutor-link";
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = `在 Python Tutor 中逐句运行示例 ${index + 1} ↗`;
+      pre.insertAdjacentElement("afterend", link);
+    });
+  };
+
+  const setupCourse = () => { setupGrowthDemo(); setupScanDemo(); setupNestedDemo(); addPythonTutorLinks(); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupCourse, {once:true});
+  else setupCourse();
+  document.addEventListener("slidechanged", setupCourse);
+})();
+</script>
+```

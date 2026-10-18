@@ -1,0 +1,556 @@
+---
+title: "队列"
+subtitle: "先进先出、循环队列与链式实现"
+author: "西南交通大学 李瑞杰"
+jupyter: python3
+format:
+  revealjs:
+    theme: simple
+    css: styles.css
+    highlight-style: github
+    slide-number: true
+    progress: true
+    controls: true
+    chalkboard: true
+    transition: fade
+    background-transition: fade
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.055
+execute:
+  echo: true
+  output: true
+  warning: false
+  freeze: false
+  cache: false
+---
+
+## 先想一想：谁先拿到餐？
+
+:::: {.columns}
+::: {.column width="45%"}
+
+食堂窗口前，A、B、C 依次到达。服务员总是先服务等待最久的人。
+
+::: {.question-card}
+若服务 A 后，D 才到达，此时队伍从前到后是什么顺序？
+:::
+
+::: {.fragment}
+答案：**B、C、D**。先到达的 B 最先离开。
+:::
+
+:::
+::: {.column width="55%"}
+
+```{=html}
+<div class="scene-card queue-metaphor" aria-label="排队场景">
+  <div class="service-window">取餐口</div>
+  <div class="person first">A<small>最先到</small></div>
+  <div class="person">B</div><div class="person">C</div>
+  <div class="chalk-arrow">移动方向 ➜</div>
+</div>
+```
+
+:::
+::::
+
+---
+
+## 本节目标
+
+学完后，你能够：
+
+- 用 **FIFO** 解释队列的逻辑特征
+- 准确区分队头 `front`、队尾 `rear` 与两个操作端
+- 逐步执行 `enqueue`、`dequeue`、`front`
+- 解释顺序队列的“假溢出”，并用循环队列解决
+- 比较顺序队列与链式队列的实现和复杂度
+- 识别队列在广度优先搜索等场景中的作用
+
+---
+
+## 队列是什么？
+
+**队列（queue）** 是只允许在一端插入、另一端删除的线性表。
+
+```{=html}
+<div class="concept-grid">
+  <div class="concept-card"><b>队尾 rear</b><span>新元素在这里入队</span></div>
+  <div class="concept-card"><b>队头 front</b><span>旧元素从这里出队</span></div>
+  <div class="concept-card"><b>FIFO</b><span>First In, First Out<br>先进先出</span></div>
+</div>
+```
+
+::: {.callout-note}
+“队列”描述的是操作受限的**逻辑结构**；顺序队列、循环队列和链式队列是不同的存储实现。
+:::
+
+---
+
+## 一张图读懂两个操作端
+
+```{=html}
+<div class="queue-anatomy">
+  <div class="end-label front-label">front<br><small>删除端</small></div>
+  <div class="queue-cells"><span class="hot">A</span><span>B</span><span>C</span><span>D</span></div>
+  <div class="end-label rear-label">rear<br><small>插入端</small></div>
+  <div class="flow-line">出队方向 ⟵　　等待顺序：A → B → C → D　　⟵ 新元素加入</div>
+</div>
+```
+
+| 操作 | 含义 | 是否改变队列 |
+|---|---|:---:|
+| `enqueue(x)` | 将 x 加入队尾 | 是 |
+| `dequeue()` | 删除并返回队头元素 | 是 |
+| `front()` | 只读取队头元素 | 否 |
+| `is_empty()` | 判断队列是否为空 | 否 |
+
+---
+
+## 静态过程图：入队与出队
+
+```{=html}
+<div class="process-strip">
+  <div class="process-stage"><small>① 初始</small><div class="mini-queue"><i>A</i><i>B</i></div><p>front 指向 A<br>rear 在 B 后方</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>② enqueue(C)</small><div class="mini-queue"><i>A</i><i>B</i><i class="hot">C</i></div><p>C 加入队尾<br>原顺序不变</p></div>
+  <div class="process-arrow">→</div>
+  <div class="process-stage"><small>③ dequeue()</small><div class="mini-queue"><i class="gone">A</i><i class="hot">B</i><i>C</i></div><p>返回 A<br>front 移到 B</p></div>
+</div>
+```
+
+::: {.callout-tip}
+队头和队尾各司其职：**队尾入，队头出**。
+:::
+
+---
+
+## 交互演示：入队与出队
+
+```{=html}
+<div class="demo" id="queue-ops-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">操作序列：enqueue(A), enqueue(B), enqueue(C), dequeue()</span>
+  </div>
+  <div class="queue-scene"></div>
+  <div class="change-note"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+每次点击只改变一个关键事实。观察新元素和返回值分别出现在哪一端。
+
+---
+
+## 顺序队列：先写一个直观版本
+
+:::: {.columns}
+::: {.column width="55%"}
+
+```{python}
+class SimpleQueue:
+    def __init__(self):
+        self._data = []
+
+    def is_empty(self):
+        return len(self._data) == 0
+
+    def enqueue(self, item):
+        self._data.append(item)
+
+    def front(self):
+        if self.is_empty():
+            raise IndexError("空队列没有队头元素")
+        return self._data[0]
+
+    def dequeue(self):
+        if self.is_empty():
+            raise IndexError("不能从空队列出队")
+        return self._data.pop(0)
+
+# 创建空队列
+q = SimpleQueue()
+
+print("是否为空：", q.is_empty())
+
+# 依次入队
+for value in ["A", "B", "C"]:
+    q.enqueue(value)
+    print(f"{value} 入队：{q._data}")
+
+# 查看队头，但不删除
+print("当前队头：", q.front())
+print("查看队头后：", q._data)
+
+# 依次出队
+while not q.is_empty():
+    value = q.dequeue()
+    print(f"{value} 出队，剩余：{q._data}")
+
+print("是否为空：", q.is_empty())
+
+# 测试空队列出队
+try:
+    q.dequeue()
+except IndexError as error:
+    print("捕获异常：", error)
+```
+
+:::
+::: {.column width="45%"}
+
+**逻辑结构**：队尾入、队头出。
+
+**存储结构**：有效元素按次序保存在连续空间。
+
+**Python 实现**：`list.append()` 在尾部入队很方便，但从表头删除会搬移后续元素。
+
+::: {.callout-warning}
+直观不等于高效：`list.pop(0)` 的时间复杂度是 $O(n)$。
+:::
+
+:::
+::::
+
+---
+
+## 固定数组：为什么会“假溢出”？
+
+若出队后只移动 `front`，不搬移元素：
+
+```{=html}
+<div class="false-overflow">
+  <div class="index-row"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+  <div class="array-row"><span class="waste">×</span><span class="waste">×</span><span>C</span><span>D</span><span>E</span><span>F</span></div>
+  <div class="pointer-row"><b style="grid-column:3">↑ front</b><b style="grid-column:7">↑ rear</b></div>
+</div>
+```
+
+- 下标 0、1 已空闲，但 `rear` 已到数组末端
+- 队列还有空间，却不能继续向右入队
+- 这不是逻辑上的队满，而是线性使用数组造成的**假溢出**
+
+::: {.question-card}
+怎样让 `rear` 回到数组开头，重新利用空位？
+:::
+
+---
+
+## 循环队列：把末尾接回开头
+
+```{=html}
+<div class="ring-wrap">
+  <div class="ring-title">下标按模运算循环</div>
+  <div class="ring" aria-label="容量为 6 的循环队列">
+    <span style="--a:0deg">0</span><span style="--a:60deg">1</span><span style="--a:120deg">2</span>
+    <span style="--a:180deg">3</span><span style="--a:240deg">4</span><span style="--a:300deg">5</span>
+    <b>rear 下一位置<br><code>(rear + 1) % 6</code></b>
+  </div>
+</div>
+```
+
+$$rear \leftarrow (rear + 1) \bmod capacity$$
+
+当 `rear = 5` 时，下一个位置是 `(5 + 1) % 6 = 0`。
+
+---
+
+## 交互演示：循环队列如何复用空间
+
+```{=html}
+<div class="demo" id="circular-demo">
+  <div class="demo-controls">
+    <button type="button" data-action="next">下一步</button>
+    <button type="button" class="secondary" data-action="reset">重新开始</button>
+    <span class="mini-note">容量 6；× 表示当前不属于队列</span>
+  </div>
+  <div class="circular-scene"></div>
+  <div class="demo-status" aria-live="polite"></div>
+</div>
+```
+
+黄色标出即将操作的位置，珊瑚红标出本步写入或移出的元素。
+
+---
+
+## 判空与判满：必须先约定语义
+
+本课约定 `front` 指向队头元素，`rear` 指向**下一可写位置**，并牺牲一个空位：
+
+| 状态 | 判断条件 | 解释 |
+|---|---|---|
+| 队空 | `front == rear` | 没有有效元素 |
+| 队满 | `(rear + 1) % capacity == front` | 再前进一步会与 front 重合 |
+| 队长 | `(rear - front + capacity) % capacity` | 跨过末尾时仍为正数 |
+
+::: {.callout-important}
+容量为 6 的数组最多保存 5 个元素。也可以额外保存 `size`，让 6 个位置全部可用；但判断条件会随约定改变。
+:::
+
+---
+
+## 循环队列：核心实现
+
+::: {.scroll-code}
+```{python}
+class CircularQueue:
+    def __init__(self, capacity):
+        if capacity < 2:
+            raise ValueError("容量至少为 2")
+        self.data = [None] * capacity
+        self.front = self.rear = 0
+
+    def is_empty(self):
+        return self.front == self.rear
+
+    def is_full(self):
+        return (self.rear + 1) % len(self.data) == self.front
+
+    def enqueue(self, item):
+        if self.is_full():
+            raise OverflowError("循环队列已满")
+        self.data[self.rear] = item
+        self.rear = (self.rear + 1) % len(self.data)
+
+    def dequeue(self, trace=False):
+        if self.is_empty():
+            raise IndexError("不能从空队列出队")
+        item = self.data[self.front]
+        self.data[self.front] = None
+        self.front = (self.front + 1) % len(self.data)
+        if trace:
+            print(f"出队 {item}；front={self.front}, rear={self.rear}")
+        return item
+
+    def peek(self):
+        if self.is_empty():
+            raise IndexError("空队列没有队头元素")
+        return self.data[self.front]
+
+    def size(self):
+        capacity = len(self.data)
+        return (self.rear - self.front + capacity) % capacity
+
+    def __len__(self):
+        return self.size()
+
+
+q = CircularQueue(5)  # 数组有 5 个位置，最多保存 4 个元素
+
+q.enqueue("A")
+q.enqueue("B")
+q.enqueue("C")
+
+print(q)            # CircularQueue(['A', 'B', 'C'], front=0, rear=3)
+print(q.peek())     # A
+print(q.dequeue())  # A
+
+q.enqueue("D")
+q.enqueue("E")
+
+print(q)            # CircularQueue(['B', 'C', 'D', 'E'], front=1, rear=0)
+print(q.size())     # 4
+print(q.is_full())  # True
+```
+:::
+
+<div class="scroll-hint">↕ 代码区可上下滚动：依次查看入队、出队、读队头与求长度</div>
+
+---
+
+
+
+## 链式队列：两个引用缺一不可
+
+```{=html}
+<div class="linked-queue">
+  <div class="pointer front-p">front</div><svg viewBox="0 0 1050 210" aria-label="链式队列">
+    <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#e0a928"/></marker></defs>
+    <line x1="120" y1="42" x2="210" y2="82" class="link-arrow"/>
+    <g transform="translate(210 60)"><rect width="180" height="80" rx="10"/><line x1="115" y1="0" x2="115" y2="80"/><text x="58" y="50">A</text><text x="147" y="50">next</text></g>
+    <line x1="390" y1="100" x2="470" y2="100" class="link-arrow"/>
+    <g transform="translate(470 60)"><rect width="180" height="80" rx="10"/><line x1="115" y1="0" x2="115" y2="80"/><text x="58" y="50">B</text><text x="147" y="50">next</text></g>
+    <line x1="650" y1="100" x2="730" y2="100" class="link-arrow"/>
+    <g transform="translate(730 60)"><rect width="180" height="80" rx="10"/><line x1="115" y1="0" x2="115" y2="80"/><text x="58" y="50">C</text><text x="147" y="50">∅</text></g>
+    <line x1="970" y1="42" x2="900" y2="72" class="link-arrow"/>
+    <text x="955" y="35" class="svg-label">rear</text>
+  </svg>
+</div>
+```
+
+- `front` 让出队直接定位头节点
+- `rear` 让入队直接定位尾节点
+- 空队列时通常令 `front = rear = None`
+
+---
+
+## 链式队列代码：先处理边界
+
+```{python}
+from collections import deque
+
+def serve(values, trace=False):
+    """用 Python 标准双端队列演示 FIFO。"""
+    q = deque()
+    served = []
+    for value in values:
+        q.append(value)          # 队尾入队 O(1)
+        if trace:
+            print(f"{value} 入队：{list(q)}")
+    while q:
+        served.append(q.popleft())  # 队头出队 O(1)
+        if trace:
+            print(f"服务 {served[-1]}：{list(q)}")
+    return served
+
+print(serve(["A", "B", "C"], trace=True))
+```
+
+::: {.callout-note}
+Python 实际编程中，优先用 `collections.deque` 实现队列；不要用 `list.pop(0)`。
+:::
+
+---
+
+## 操作复杂度：前提比结论更重要
+
+| 操作 | 循环队列 | 链式队列 | Python `deque` | 成立前提 |
+|---|:---:|:---:|:---:|---|
+| 入队 | $O(1)$ | $O(1)$ | $O(1)$ | 链式队列保存 `rear` |
+| 出队 | $O(1)$ | $O(1)$ | $O(1)$ | 已知 `front`；不搬移元素 |
+| 读队头 | $O(1)$ | $O(1)$ | $O(1)$ | 直接定位队头 |
+| 空间 | $O(C)$ | $O(n)$ | $O(n)$ | $C$ 为数组容量 |
+
+::: {.callout-warning}
+若链式队列只保存 `front`，每次入队都从头寻找尾节点，入队会退化为 $O(n)$。
+:::
+
+---
+
+## 应用：广度优先搜索为什么用队列？
+
+```{=html}
+<div class="bfs-layout">
+  <div class="level"><span class="node start">A</span></div>
+  <div class="tree-links">╱　　　╲</div>
+  <div class="level"><span class="node">B</span><span class="node">C</span></div>
+  <div class="tree-links">╱　╲　　　╲</div>
+  <div class="level"><span class="node">D</span><span class="node">E</span><span class="node">F</span></div>
+  <div class="visit-order">访问顺序：A → B → C → D → E → F</div>
+</div>
+```
+
+发现节点时把它的邻接点加入队尾；先发现的节点先从队头取出，因此搜索按“层”向外扩展。
+
+::: {.question-card}
+若改用栈，访问顺序还会保持逐层扩展吗？
+:::
+
+---
+
+
+
+## 课堂练习
+
+容量为 5 的循环队列，采用“牺牲一个空位”的约定。初始 `front = rear = 0`，依次执行：
+
+```text
+enqueue(3), enqueue(7), dequeue(), enqueue(5),
+enqueue(9), enqueue(2), dequeue()
+```
+
+1. 两次 `dequeue()` 分别返回什么？
+2. 最终队列从队头到队尾有哪些元素？
+3. 最终 `front` 和 `rear` 各是多少？
+
+::: {.fragment}
+答案：返回 3、7；最终队列为 5、9、2；`front = 2`，`rear = 0`（发生回绕）。
+:::
+
+---
+
+## 小结
+
+- 队列是操作受限的线性表：**队尾入、队头出**
+- FIFO 描述“先进入，先离开”
+- 顺序队列若只向右使用会假溢出；循环队列用模运算复用空间
+- 判空、判满依赖 `front` 与 `rear` 的具体约定
+- 链式队列保存首尾引用，入队和出队才能都是 $O(1)$
+- BFS 的逐层扩展来自队列的先进先出次序
+
+::: {.callout-tip}
+检验是否真正理解队列：画出每一步的 `front`、`rear` 和有效元素，而不是只背公式。
+:::
+
+<script>
+const setupQueueOpsDemo = () => {
+  const root = document.getElementById("queue-ops-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const states = [
+    {items:[], active:-1, kind:"", note:"准备开始", text:"空队列：front 与 rear 重合"},
+    {items:["A"], active:0, kind:"in", note:"enqueue(A)", text:"A 从队尾入队；它也是队头"},
+    {items:["A","B"], active:1, kind:"in", note:"enqueue(B)", text:"B 加入队尾；A 仍在队头"},
+    {items:["A","B","C"], active:2, kind:"in", note:"enqueue(C)", text:"C 加入队尾；等待次序不变"},
+    {items:["B","C"], active:0, kind:"out", note:"dequeue() → A", text:"A 从队头出队并被返回；B 成为新队头"}
+  ];
+  let step = 0;
+  const render = () => {
+    const s = states[step];
+    root.querySelector(".queue-scene").innerHTML = s.items.length
+      ? `<div class="q-end">front<br><small>出队端</small></div><div class="q-items">${s.items.map((v,i)=>`<span class="${i===s.active?s.kind:""}">${v}</span>`).join("")}</div><div class="q-end">rear<br><small>入队端</small></div>`
+      : `<div class="empty-queue">空队列 ∅</div>`;
+    root.querySelector(".change-note").textContent = s.note;
+    root.querySelector(".demo-status").textContent = `步骤 ${step+1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const setupCircularDemo = () => {
+  const root = document.getElementById("circular-demo");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "true";
+  const states = [
+    {cells:[null,null,"C","D","E",null], front:2, rear:5, active:-1, kind:"", text:"初始：有效队列为 C、D、E，数组前部有空位"},
+    {cells:[null,null,"C","D","E","F"], front:2, rear:0, active:5, kind:"write", text:"enqueue(F)：写入下标 5；rear 回绕到 0"},
+    {cells:["G",null,"C","D","E","F"], front:2, rear:1, active:0, kind:"write", text:"enqueue(G)：复用下标 0；rear 前进到 1"},
+    {cells:["G",null,null,"D","E","F"], front:3, rear:1, active:2, kind:"remove", text:"dequeue() → C：清空下标 2；front 前进到 3"}
+  ];
+  let step=0;
+  const render=()=>{
+    const s=states[step];
+    root.querySelector(".circular-scene").innerHTML=`<div class="c-index">${s.cells.map((_,i)=>`<span>${i}</span>`).join("")}</div><div class="c-cells">${s.cells.map((v,i)=>`<span class="${i===s.active?s.kind:""}">${v??"×"}</span>`).join("")}</div><div class="c-pointers">${s.cells.map((_,i)=>`<span>${i===s.front?"↑ front":""}${i===s.rear?`${i===s.front?" / ":"↑ "}rear`:""}</span>`).join("")}</div>`;
+    root.querySelector(".demo-status").textContent=`步骤 ${step+1}/${states.length}：${s.text}`;
+  };
+  root.querySelector('[data-action="next"]').addEventListener("click",()=>{step=Math.min(step+1,states.length-1);render();});
+  root.querySelector('[data-action="reset"]').addEventListener("click",()=>{step=0;render();});
+  render();
+};
+
+const addPythonTutorLinks = () => {
+  document.querySelectorAll("div.sourceCode.cell-code").forEach(block => {
+    if (block.dataset.tutorReady) return;
+    const code = block.innerText;
+    if (!code || code.length > 2200) return;
+    block.dataset.tutorReady = "true";
+    const link = document.createElement("a");
+    link.className = "pythontutor-link";
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "在 Python Tutor 中逐句执行 ↗";
+    link.href = `https://pythontutor.com/render.html#code=${encodeURIComponent(code)}&cumulative=false&curInstr=0&heapPrimitives=nevernest&origin=opt-frontend.js&py=3&rawInputLstJSON=%5B%5D&textReferences=false`;
+    block.insertAdjacentElement("afterend", link);
+  });
+};
+
+const setupCourse = () => { setupQueueOpsDemo(); setupCircularDemo(); addPythonTutorLinks(); };
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupCourse, {once:true});
+else setupCourse();
+document.addEventListener("slidechanged", setupCourse);
+</script>

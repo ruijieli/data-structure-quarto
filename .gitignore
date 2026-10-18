@@ -1,0 +1,10 @@
+.DS_Store
+.quarto/
+_site/
+**/output/
+**/build/
+**/dist/
+**/*_files/
+*.quarto_ipynb*
+*.html
+!线性表/web/interactions.html

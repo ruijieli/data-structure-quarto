@@ -1,0 +1,275 @@
+---
+title: "线性表"
+subtitle: "从连续存储到指针连接"
+author: "数据结构课堂"
+format:
+  revealjs:
+    css: theme.css
+    include-after-body: interactions.html
+    slide-number: c/t
+    progress: true
+    controls: true
+    controls-layout: edges
+    transition: slide
+    background-transition: fade
+    hash: true
+    center: false
+    width: 1280
+    height: 720
+    margin: 0.04
+    navigation-mode: linear
+    code-line-numbers: false
+    footer: "数据结构 · 线性表"
+lang: zh-CN
+---
+
+## 线性表 {background-image="../assets/linear-train.png" background-size="52%" background-position="92% 54%"}
+
+<div class="hero-copy">
+
+# 线性表
+
+## 从连续存储到指针连接
+
+一节课看懂顺序表与单链表的操作过程
+
+</div>
+
+## 今天解决三个问题
+
+::: {.question-list}
+1. 线性表到底“线性”在哪里？
+2. 顺序表和链表怎样完成插入、删除？
+3. 面对具体任务，如何选择存储方式？
+:::
+
+::: {.takeaway fragment}
+逻辑关系相同，存储方式不同，操作代价随之改变。
+:::
+
+## 线性表的逻辑关系
+
+<div class="formula">L = (a₀, a₁, …, aₙ₋₁)</div>
+
+::: incremental
+- 除首元素外，每个元素有且只有一个直接前驱
+- 除尾元素外，每个元素有且只有一个直接后继
+- “线性”描述逻辑关系，不要求元素在内存中挨着
+:::
+
+## 抽象数据类型
+
+| 操作 | 含义 | 接口示例 |
+|---|---|---|
+| 初始化 | 建立空表 | `InitList()` |
+| 访问 | 读取第 $i$ 个元素 | `GetElem(i)` |
+| 查找 | 找到满足条件的元素 | `LocateElem(x)` |
+| 插入 | 在位置 $i$ 放入新元素 | `Insert(i, x)` |
+| 删除 | 移除位置 $i$ 的元素 | `Delete(i)` |
+
+<p class="caption">接口语义保持一致，实现方式可以不同。</p>
+
+## 两种存储方式
+
+:::: columns
+::: {.column width="50%"}
+### 顺序表
+
+<div class="structure-line array-static">
+<span>12</span><span>25</span><span>37</span><span>48</span>
+</div>
+
+- 连续存储
+- 下标直接定位
+- 中间修改需要搬移
+:::
+::: {.column width="50%"}
+### 单链表
+
+<div class="structure-line linked-static">
+<span>12</span><i>→</i><span>25</span><i>→</i><span>37</span><i>→</i><span>48</span>
+</div>
+
+- 节点位置可以分散
+- 指针建立次序
+- 访问第 $i$ 个元素要遍历
+:::
+::::
+
+## 顺序表的地址计算
+
+<div class="formula accent">LOC(aᵢ) = LOC(a₀) + i × w</div>
+
+:::: columns
+::: {.column width="52%"}
+首地址为 1000，每个整数占 4 字节。
+
+| 下标 | 地址 |
+|---:|---:|
+| 0 | 1000 |
+| 1 | 1004 |
+| 2 | 1008 |
+| 3 | 1012 |
+:::
+::: {.column width="48%"}
+<div class="big-o">O(1)</div>
+<p class="centered">一次乘法和一次加法即可定位</p>
+:::
+::::
+
+## 顺序表插入的动态过程
+
+<div class="interactive-demo" id="array-insert-demo">
+  <div class="demo-toolbar">
+    <button data-action="prev" aria-label="上一步">上一步</button>
+    <span class="step-label">步骤 1 / 4：初始状态</span>
+    <button data-action="next" aria-label="下一步">下一步</button>
+    <button data-action="reset" class="ghost">重置</button>
+  </div>
+  <div class="array-stage" aria-live="polite"></div>
+  <div class="demo-note"></div>
+</div>
+
+<p class="caption">课堂操作：点击“下一步”，观察元素移动顺序。</p>
+
+## 顺序表插入算法
+
+:::: columns
+::: {.column width="62%"}
+```c
+for (int j = length; j > i; --j)
+    data[j] = data[j - 1];
+
+data[i] = x;
+length++;
+```
+:::
+::: {.column width="38%"}
+<div class="complexity-callout">
+<small>最坏情况</small>
+<strong>插在表头</strong>
+<b>O(n)</b>
+</div>
+:::
+::::
+
+## 顺序表删除
+
+<div class="delete-sequence">
+  <div><em>原表</em><span>12</span><span class="deleted">25</span><span>37</span><span>48</span><span>56</span></div>
+  <div class="fragment"><em>左移</em><span>12</span><span class="moved">37</span><span class="moved">48</span><span class="moved">56</span><span class="empty">空</span></div>
+</div>
+
+::: {.takeaway fragment}
+平均移动约一半元素，时间复杂度仍为 O(n)。
+:::
+
+## 单链表节点
+
+:::: columns
+::: {.column width="58%"}
+```c
+typedef struct Node {
+    ElemType data;
+    struct Node *next;
+} Node;
+```
+:::
+::: {.column width="42%"}
+<dl class="definition-list">
+<dt>data</dt><dd>保存数据</dd>
+<dt>next</dt><dd>保存后继节点地址</dd>
+</dl>
+:::
+::::
+
+## 单链表访问
+
+<div class="walk-demo" id="walk-demo">
+  <div class="walk-chain">
+    <span data-index="0">12</span><i>→</i><span data-index="1">25</span><i>→</i><span data-index="2">37</span><i>→</i><span data-index="3">48</span>
+  </div>
+  <button data-action="walk">访问下一个节点</button>
+  <button data-action="walk-reset" class="ghost">重新开始</button>
+  <p class="walk-status">当前：head，尚未访问节点</p>
+</div>
+
+<div class="takeaway fragment">访问下标 3 前，必须经过前三个节点，所以随机访问为 O(n)。</div>
+
+## 单链表插入
+
+<div class="pointer-steps">
+  <div><b>原来</b><code>p ─────────→ q</code></div>
+  <div class="fragment"><b>步骤 1</b><code>s ─────────→ q</code><small>s-&gt;next = p-&gt;next</small></div>
+  <div class="fragment"><b>步骤 2</b><code>p ─────────→ s</code><small>p-&gt;next = s</small></div>
+</div>
+
+<p class="warning fragment">顺序不能颠倒，否则可能丢失原后继节点地址。</p>
+
+## 单链表删除的动态过程
+
+<div class="interactive-demo linked-demo" id="linked-delete-demo">
+  <div class="demo-toolbar">
+    <button data-action="delete">删除节点 37</button>
+    <button data-action="delete-reset" class="ghost">重置</button>
+  </div>
+  <div class="linked-stage">
+    <span>12</span><i>→</i><span>25</span><i class="bridge">→</i><span class="target">37</span><i>→</i><span>48</span><i>→ ∅</i>
+  </div>
+  <p class="delete-status">删除前：25 的 next 指向 37</p>
+</div>
+
+## 复杂度对比
+
+| 操作 | 顺序表 | 单链表 |
+|---|:---:|:---:|
+| 按下标访问 | **O(1)** | O(n) |
+| 按值查找 | O(n) | O(n) |
+| 已知位置后的插入 | O(n) | **O(1)** |
+| 已知前驱的删除 | O(n) | **O(1)** |
+| 缓存友好性 | 好 | 较弱 |
+
+<p class="caption">链表若先寻找位置，总体仍可能是 O(n)。</p>
+
+## 结构选择
+
+:::: columns
+::: {.column width="50%"}
+### 更适合顺序表
+
+- 经常按下标访问
+- 数据规模相对稳定
+- 追求缓存效率
+:::
+::: {.column width="50%"}
+### 更适合链表
+
+- 插入、删除频繁
+- 已持有目标附近的指针
+- 规模变化难以预测
+:::
+::::
+
+<div class="takeaway fragment">先看主要操作，再选存储结构。</div>
+
+## 课堂练习
+
+<div class="exercise-prompt">初始顺序表：[8, 15, 23, 42, 57]</div>
+
+::: incremental
+1. 在下标 2 插入 19，哪些元素发生移动？
+2. 再删除下标 4 的元素，最终序列是什么？
+3. 两次操作一共完成多少次元素赋值？
+:::
+
+<p class="caption">画出每一步状态，不要只写最终答案。</p>
+
+## 小结与课后任务
+
+- 线性表规定一对一的前驱、后继关系
+- 顺序表用连续空间换取 O(1) 随机访问
+- 链表用指针换取局部修改的灵活性
+
+::: {.assignment fragment}
+实现 `insert(i,x)`、`delete(i)`、`get(i)`、`find(x)`、`print()`，并说明如何处理空表、越界和最慢操作。
+:::
