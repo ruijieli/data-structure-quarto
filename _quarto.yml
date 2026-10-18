@@ -3,7 +3,6 @@ project:
   output-dir: _site
   render:
     - index.qmd
-    - 线性表/线性表_交互课堂.qmd
     - 线性表/web/linear-list-web.qmd
     - 栈/stack.qmd
     - 队列/queue.qmd
@@ -19,8 +18,6 @@ website:
         href: index.qmd
       - text: "课件"
         menu:
-          - text: "线性表"
-            href: 线性表/线性表_交互课堂.html
           - text: "线性表（网页交互版）"
             href: 线性表/web/linear-list-web.html
           - text: "栈"
