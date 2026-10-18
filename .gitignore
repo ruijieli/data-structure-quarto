@@ -8,7 +8,6 @@ _site/
 *.quarto_ipynb*
 *.html
 !线性表/web/interactions.html
-/线性表/线性表_交互课堂.qmd
 
 /.quarto/
 **/*.quarto_ipynb
